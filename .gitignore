@@ -1,2 +1,4 @@
 env/
 temp_repos/
+test_llm.py
+.env

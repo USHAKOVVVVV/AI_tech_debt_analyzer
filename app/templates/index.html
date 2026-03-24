@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+	<head>
+		<title>Tech Debt Analyzer</title>
+		<style>
+			body {
+				font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+				background-color: #f4f7f6;
+				display: flex;
+				justify-content: center;
+				padding: 40px 20px;
+			}
+			.container {
+				width: 100%;
+				max-width: 800px; /* Увеличили ширину, чтобы текст влезал */
+				background: white;
+				padding: 30px;
+				border-radius: 12px;
+				box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+			}
+			h2 {
+				color: #2c3e50;
+				margin-bottom: 25px;
+			}
+			input {
+				width: calc(100% - 24px);
+				padding: 12px;
+				margin-bottom: 15px;
+				border: 2px solid #dfe6e9;
+				border-radius: 8px;
+				font-size: 16px;
+				outline: none;
+			}
+			input:focus {
+				border-color: #007bff;
+			}
+			button {
+				width: 100%;
+				padding: 12px;
+				background: #007bff;
+				color: white;
+				border: none;
+				border-radius: 8px;
+				font-size: 16px;
+				font-weight: bold;
+				cursor: pointer;
+				transition: background 0.3s;
+			}
+			button:hover {
+				background: #0056b3;
+			}
+
+			/* Стили для окна результата */
+			#result {
+				margin-top: 30px;
+				text-align: left;
+				padding: 20px;
+				border-radius: 8px;
+				background: #ffffff;
+				border: 1px solid #e1e8ed;
+				display: none;
+				line-height: 1.6; /* Межстрочный интервал для читаемости */
+				word-wrap: break-word; /* Чтобы длинные ссылки или слова не рвали контейнер */
+			}
+			.score-card {
+				background: #f8f9fa;
+				border-left: 5px solid #007bff;
+				padding: 10px 15px;
+				margin-bottom: 10px;
+				border-radius: 4px;
+			}
+			.badge {
+				display: inline-block;
+				padding: 2px 8px;
+				border-radius: 12px;
+				background: #e1f5fe;
+				color: #01579b;
+				font-size: 0.9em;
+				font-weight: bold;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h2>Анализ техдолга</h2>
+			<input
+				type="text"
+				id="repoUrl"
+				placeholder="Вставьте URL репозитория (https://...)"
+			/>
+			<button onclick="sendAnalysis()">Анализировать</button>
+			<div id="result"></div>
+		</div>
+
+		<script>
+			window.lastAnalysisData = null
+
+			async function sendAnalysis() {
+				const url = document.getElementById('repoUrl').value
+				const resultDiv = document.getElementById('result')
+				resultDiv.style.display = 'block'
+				resultDiv.innerText = 'Клонирование и анализ... подождите...'
+
+				const response = await fetch('/analyze', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ repo_url: url }),
+				})
+				const data = await response.json()
+
+				if (data.status === 'success') {
+					window.lastAnalysisData = data
+
+					let html = `<h2 style="color: #007bff;">Анализ завершен успешно</h2>`
+					html += `<p><b>Репозиторий:</b> <a href="${data.info.repo_url}" target="_blank">${data.info.repo_url}</a></p>`
+					html += `<p><span class="badge">Модель: ${data.info.model_used}</span> <span class="badge">Дата: ${data.info.analysis_date}</span></p>`
+
+					html += `<h3>📊 Критерии оценки:</h3>`
+					data.report.criteria_scores.forEach(item => {
+						html += `
+									<div class="score-card">
+											<strong>${item.name}:</strong> ${item.score}/10
+											<br><small style="color: #636e72;">${item.comment}</small>
+									</div>`
+					})
+
+					html += `<h3>📝 Итоги анализа:</h3>`
+					html += `<p style="background: #fff9db; padding: 15px; border-radius: 8px;">${data.report.analysis_summary}</p>`
+
+					html += `<h3>🚀 План действий:</h3><ul>`
+					data.report.useful_info.refactoring_plan.forEach(step => {
+						html += `<li style="margin-bottom: 8px;">${step}</li>`
+					})
+					html += `</ul>`
+
+					// Добавим кнопку скачивания (подготовим почву для следующего шага)
+					html += `<button onclick="downloadExcel()" style="background: #28a745; margin-top: 20px;">Скачать Excel отчет</button>`
+
+					resultDiv.innerHTML = html
+				} else {
+					resultDiv.innerText = 'Ошибка: ' + data.detail
+				}
+			}
+
+			async function downloadExcel() {
+				// Мы берем те данные, которые уже получили в переменную 'lastAnalysisData'
+				// (для этого сохрани результат последнего анализа в глобальную переменную)
+				if (!window.lastAnalysisData) return alert('Сначала проведите анализ!')
+
+				const response = await fetch('/download/excel', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify(window.lastAnalysisData),
+				})
+
+				const blob = await response.blob()
+				const url = window.URL.createObjectURL(blob)
+				const a = document.createElement('a')
+				a.href = url
+				a.download = 'report.xlsx'
+				document.body.appendChild(a)
+				a.click()
+				a.remove()
+			}
+		</script>
+	</body>
+</html>
