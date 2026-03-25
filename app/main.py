@@ -5,9 +5,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
 from openai import OpenAI
 from dotenv import load_dotenv
+from sqlalchemy.orm import Session
+from fastapi import Depends
 import os
 import json
 
+from .database import engine, get_db
+from . import models
 from .utils import clone_and_extract_info, generate_excel_report
 
 # 1. Создаем экземпляр приложения
@@ -21,6 +25,9 @@ client = OpenAI(
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Создает таблицы, если их еще нет
+models.Base.metadata.create_all(bind=engine)
 
 # 2. Описываем, как должен выглядеть запрос от пользователя.
 class AnalysisRequest(BaseModel):
@@ -74,31 +81,35 @@ async def get_llm_report(full_context: str):
     return json.loads(response.choices[0].message.content)
 
 @app.post("/analyze")
-async def start_analysis(data: AnalysisRequest):
+async def start_analysis(data: AnalysisRequest, db: Session = Depends(get_db)):
     try:
-        # 1. Клонируем и парсим (твой utils.py)
+        # ... твой текущий код (клонирование, вызов ЛЛМ) ...
         repo_data = clone_and_extract_info(str(data.repo_url))
-        
-        # 2. Формируем текст для промпта (функция, которую мы обсуждали ранее)
-        # Если её еще нет в main.py, добавь её (она склеивает коммиты и код)
         full_context = prepare_prompt_context(repo_data)
-        
-        # 3. Отправляем в ЛЛМ и получаем структурированный JSON
         report_json = await get_llm_report(full_context)
         
-        # 4. Добавляем техническую инфу для отчета (пункты 1, 2, 3 из ТЗ)
-        final_report = {
+        # Подготавливаем объект для БД
+        new_result = models.AnalysisResult(
+            repo_url=str(data.repo_url),
+            model_name="openai/gpt-oss-120b",
+            full_report=report_json
+        )
+        
+        # Сохраняем в PostgreSQL
+        db.add(new_result)
+        db.commit()
+        db.refresh(new_result)
+
+        return {
             "status": "success",
+            "id": new_result.id, # Теперь у каждого анализа есть свой ID!
             "info": {
                 "repo_url": str(data.repo_url),
-                "analysis_date": "2026-03-24", # Можно использовать datetime.now()
+                "analysis_date": new_result.analysis_date.isoformat(),
                 "model_used": "gpt-oss-120b"
             },
-            "report": report_json # Здесь лежат оценки и итоги от модели
+            "report": report_json
         }
-        
-        return final_report
-
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
