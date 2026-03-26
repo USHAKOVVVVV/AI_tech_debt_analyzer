@@ -56,15 +56,12 @@ def generate_excel_report(data: dict):
     try:
         output = io.BytesIO()
         
-        # 1. Готовим данные для первой вкладки (Общая информация)
         # Превращаем всё в строки, чтобы объекты типа HttpUrl не ломали Pandas
         info_cleaned = {k: str(v) for k, v in data["info"].items()}
         info_df = pd.DataFrame([info_cleaned])
         
-        # 2. Готовим данные для второй вкладки (Оценки)
         scores_df = pd.DataFrame(data["report"]["criteria_scores"])
         
-        # 3. Готовим данные для третьей вкладки (План рефакторинга)
         plan_df = pd.DataFrame({
             "Шаги рефакторинга": data["report"]["useful_info"]["refactoring_plan"]
         })

@@ -13,7 +13,7 @@
 ## 🚀 Технологический стек
 
 - **Backend:** FastAPI, SQLAlchemy, Pandas.
-- **Frontend:** HTML5, CSS3 (Modern UI), JavaScript (Async/Fetch).
+- **Frontend:** HTML5, JavaScript.
 - **AI:** OpenAI API (openai/gpt-oss-120b).
 - **Database:** PostgreSQL (в Docker-контейнере).
 - **DevOps:** Docker, GitPython.

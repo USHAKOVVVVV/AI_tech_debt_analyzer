@@ -14,7 +14,7 @@ from .database import engine, get_db
 from . import models
 from .utils import clone_and_extract_info, generate_excel_report
 
-# 1. Создаем экземпляр приложения
+
 app = FastAPI()
 
 load_dotenv()
@@ -29,11 +29,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Создает таблицы, если их еще нет
 models.Base.metadata.create_all(bind=engine)
 
-# 2. Описываем, как должен выглядеть запрос от пользователя.
+
 class AnalysisRequest(BaseModel):
     repo_url: HttpUrl
 
-# 3. Создаем endpoint, который принимает POST-запрос.
+# Создаем endpoint, который принимает POST-запрос
 
 def prepare_prompt_context(repo_data: dict):
     # Собираем историю коммитов в читаемый текст
@@ -69,21 +69,19 @@ system_prompt = """
 """
 
 async def get_llm_report(full_context: str):
-    # Используем твой рабочий конфиг Groq/OpenAI
     response = client.chat.completions.create(
-        model="openai/gpt-oss-120b", # или твоя рабочая модель
+        model="openai/gpt-oss-120b", 
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": full_context}
         ],
-        response_format={ "type": "json_object" } # Важно: заставляем модель выдать JSON
+        response_format={ "type": "json_object" } # Заставляем модель выдать JSON
     )
     return json.loads(response.choices[0].message.content)
 
 @app.post("/analyze")
 async def start_analysis(data: AnalysisRequest, db: Session = Depends(get_db)):
     try:
-        # ... твой текущий код (клонирование, вызов ЛЛМ) ...
         repo_data = clone_and_extract_info(str(data.repo_url))
         full_context = prepare_prompt_context(repo_data)
         report_json = await get_llm_report(full_context)
@@ -102,7 +100,7 @@ async def start_analysis(data: AnalysisRequest, db: Session = Depends(get_db)):
 
         return {
             "status": "success",
-            "id": new_result.id, # Теперь у каждого анализа есть свой ID!
+            "id": new_result.id, # У каждого анализа есть свой ID!
             "info": {
                 "repo_url": str(data.repo_url),
                 "analysis_date": new_result.analysis_date.isoformat(),
